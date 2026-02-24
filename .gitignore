@@ -1,0 +1,19 @@
+﻿# deps
+node_modules/
+
+# build output
+dist/
+build/
+.next/
+out/
+
+# env
+.env
+.env.*
+
+# tooling/editor
+.vscode/
+.idea/
+
+# Cursor
+.cursor/

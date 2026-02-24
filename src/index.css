@@ -1,0 +1,40 @@
+:root {
+  --bg-cream: #FDF8F3;
+  --bg-white: #FFFBF7;
+  --pastel-pink: #F8E8EE;
+  --pastel-blue: #E8F4F8;
+  --pastel-green: #E8F5E9;
+  --pastel-purple: #F3E8F5;
+  --pastel-beige: #F5F0E8;
+  --text-dark: #5C4A3D;
+  --text-muted: #8B7355;
+  --shadow-soft: 0 2px 12px rgba(92, 74, 61, 0.08);
+  --shadow-card: 0 4px 20px rgba(92, 74, 61, 0.1);
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-cream);
+  color: var(--text-dark);
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input, select {
+  font-family: inherit;
+}

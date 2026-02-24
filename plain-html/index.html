@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wedding Seat Plan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-cream: #FDF8F3;
+      --bg-white: #FFFBF7;
+      --pastel-pink: #F8E8EE;
+      --pastel-blue: #E8F4F8;
+      --pastel-green: #E8F5E9;
+      --pastel-beige: #F5F0E8;
+      --text-dark: #5C4A3D;
+      --text-muted: #8B7355;
+      --shadow-soft: 0 2px 12px rgba(92, 74, 61, 0.08);
+      --shadow-card: 0 4px 20px rgba(92, 74, 61, 0.1);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --left-width: 280px;
+      --right-width: 280px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Quicksand', sans-serif; background: var(--bg-cream); color: var(--text-dark); min-height: 100vh; }
+    .app-header { background: var(--bg-white); padding: 1rem 1.5rem; box-shadow: var(--shadow-soft); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
+    .app-header h1 { margin: 0; font-size: 1.5rem; font-weight: 600; }
+    .undo-redo { display: flex; gap: 0.5rem; }
+    .undo-redo button { padding: 0.4rem 0.75rem; font-size: 0.85rem; border: 1px solid rgba(92,74,61,0.2); border-radius: var(--radius-sm); background: var(--bg-white); cursor: pointer; }
+    .undo-redo button:hover { background: var(--pastel-beige); }
+    .undo-redo button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .app-layout {
+      display: grid;
+      grid-template-columns: var(--left-width) 6px 1fr 6px var(--right-width);
+      min-height: calc(100vh - 60px);
+      overflow: hidden;
+    }
+    .panel { background: var(--bg-white); box-shadow: var(--shadow-soft); overflow: auto; }
+    .panel-left { border-right: 1px solid rgba(92, 74, 61, 0.08); min-width: 180px; }
+    .panel-right { border-left: 1px solid rgba(92, 74, 61, 0.08); min-width: 180px; }
+    .panel-center { background: var(--bg-cream); overflow: hidden; padding: 0; position: relative; }
+    .resizer { background: rgba(92, 74, 61, 0.1); cursor: col-resize; flex-shrink: 0; }
+    .resizer:hover { background: rgba(92, 74, 61, 0.2); }
+    .guest-panel { padding: 1rem; }
+    .guest-panel-config { display: flex; gap: 1rem; margin-bottom: 1rem; padding: 0.75rem; background: var(--pastel-beige); border-radius: var(--radius-sm); }
+    .config-row { display: flex; align-items: center; gap: 0.5rem; }
+    .config-row label { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); }
+    .config-row input { width: 4rem; padding: 0.35rem 0.5rem; border: 1px solid rgba(92, 74, 61, 0.2); border-radius: var(--radius-sm); }
+    .guest-panel-header { margin-bottom: 0.75rem; }
+    .guest-panel-header h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+    .guest-list-scroll { display: flex; flex-direction: column; gap: 0.5rem; max-height: calc(100vh - 280px); overflow-y: auto; }
+    .guest-list-item { display: flex; align-items: stretch; background: var(--bg-white); border-radius: var(--radius-sm); border: 1px solid rgba(92, 74, 61, 0.1); border-left: 3px solid; padding: 0; box-shadow: var(--shadow-soft); }
+    .guest-list-item.assigned { opacity: 0.55; background: #f8f6f3; }
+    .guest-list-item.assigned .guest-name-input { color: var(--text-muted); }
+    .guest-drag-handle { padding: 0.5rem 0.4rem; cursor: grab; color: var(--text-muted); font-size: 0.75rem; background: rgba(92, 74, 61, 0.04); border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+    .guest-drag-handle:active { cursor: grabbing; }
+    .guest-content { flex: 1; padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; }
+    .guest-name-input { border: none; background: transparent; font-size: 0.9rem; font-weight: 500; }
+    .guest-group-select { width: 100%; padding: 0.25rem; border: 1px solid rgba(92, 74, 61, 0.15); border-radius: 4px; font-size: 0.8rem; }
+    .guest-list-item.dragging { opacity: 0.6; }
+    .guest-list-item.special-row .guest-content { padding-top: 0.4rem; }
+    .special-label { font-size: 0.75rem; color: var(--text-muted); margin-top: -0.2rem; }
+    .venue { position: absolute; inset: 0; overflow: hidden; background: var(--bg-cream); cursor: grab; }
+    .venue.panning { cursor: grabbing; }
+    .venue .venue-canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+    .venue-inner { position: relative; width: 100%; min-height: 1600px; padding-bottom: 120px; }
+    .venue-zoom-controls { position: absolute; right: 12px; bottom: 100px; z-index: 20; display: flex; flex-direction: column; gap: 4px; }
+    .venue-zoom-controls button { width: 32px; height: 32px; border-radius: var(--radius-sm); border: 1px solid rgba(92,74,61,0.25); background: var(--bg-white); color: var(--text-dark); font-size: 1.2rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-soft); }
+    .venue-zoom-controls button:hover { background: var(--pastel-beige); }
+    .table-wrapper { position: absolute; cursor: default; }
+    .table-wrapper.selected { outline: 3px solid var(--pastel-pink); outline-offset: 2px; z-index: 10; }
+    .table-wrapper.dragging-table { cursor: grabbing; z-index: 100; }
+    .table-resize-handle { position: absolute; width: 10px; height: 10px; background: var(--pastel-pink); border: 1px solid rgba(92,74,61,0.3); border-radius: 2px; cursor: nwse-resize; z-index: 5; }
+    .table-resize-handle.round-handle { cursor: ew-resize; }
+    .table-shape-body { cursor: grab; position: relative; background: var(--pastel-beige); border: 2px solid rgba(92, 74, 61, 0.2); transition: background 0.2s; }
+    .table-shape-body:hover { background: #ede6df; }
+    .table-shape-body:active { cursor: grabbing; }
+    .table-shape-round .table-shape-body { border-radius: 50%; }
+    .table-seats-wrap { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+    .table-seats-wrap > * { pointer-events: auto; }
+    .seat { font-size: 0.65rem; padding: 0.3rem 0.4rem; border-radius: 6px; min-width: 52px; text-align: center; border: 2px dashed rgba(92, 74, 61, 0.25); background: rgba(255,255,255,0.9); cursor: grab; transition: background 0.15s; position: absolute; }
+    .seat .seat-grip { position: absolute; left: 2px; top: 2px; font-size: 0.5rem; cursor: move; color: var(--text-muted); }
+    .seat.filled { border-style: solid; border-color: transparent; }
+    .seat.empty { color: var(--text-muted); cursor: default; }
+    .seat.drag-over { background: var(--pastel-pink); border-color: var(--pastel-pink); }
+    .seat.dragging { opacity: 0.5; }
+    .table-label { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 0.75rem; font-weight: 600; color: var(--text-muted); pointer-events: auto; cursor: text; }
+    .table-label-input { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 0.75rem; font-weight: 600; width: 80%; max-width: 120px; padding: 2px 6px; border: 1px solid var(--pastel-pink); border-radius: 4px; text-align: center; }
+    .seat-btns { position: absolute; right: -36px; top: 50%; transform: translateY(-50%); display: flex; gap: 4px; z-index: 6; }
+    .add-seat-btn, .remove-seat-btn { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(92,74,61,0.3); color: var(--text-dark); font-size: 1rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+    .add-seat-btn { background: var(--pastel-pink); }
+    .add-seat-btn:hover { background: #f0d4dc; }
+    .remove-seat-btn { background: var(--pastel-beige); font-size: 1.1rem; }
+    .remove-seat-btn:hover { background: #e8dfd5; }
+    .remove-seat-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .seat-delete-btn { position: absolute; right: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; border: none; background: rgba(92,74,61,0.25); color: var(--text-dark); font-size: 0.7rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; z-index: 2; }
+    .seat-delete-btn:hover { background: rgba(180,60,60,0.5); color: #fff; }
+    .groups-section { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(92,74,61,0.1); }
+    .groups-section h4 { margin: 0 0 0.5rem 0; font-size: 0.9rem; }
+    .add-group-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+    .add-group-row input { flex: 1; padding: 0.35rem; font-size: 0.8rem; }
+    .add-group-row button { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
+    .guest-child-wrap { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; }
+    .guest-child-wrap input { width: auto; }
+    .unassigned-zone { position: absolute; bottom: 24px; left: 24px; right: 24px; padding: 0.75rem 1rem; background: var(--pastel-beige); border: 2px dashed rgba(92, 74, 61, 0.2); border-radius: var(--radius); min-height: 56px; }
+    .unassigned-zone.drag-over { background: var(--pastel-pink); border-color: var(--pastel-pink); }
+    .unassigned-label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.4rem; }
+    .unassigned-guests { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .unassigned-chip { font-size: 0.75rem; padding: 0.3rem 0.5rem; background: var(--bg-white); border-radius: 999px; }
+    .table-settings { padding: 1rem; margin-bottom: 1rem; background: var(--pastel-beige); border-radius: var(--radius-sm); }
+    .table-settings h3 { margin: 0 0 0.75rem 0; font-size: 0.95rem; }
+    .table-settings .field { margin-bottom: 0.6rem; }
+    .table-settings label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.2rem; }
+    .table-settings input, .table-settings select { width: 100%; padding: 0.4rem; border: 1px solid rgba(92, 74, 61, 0.2); border-radius: var(--radius-sm); font-size: 0.85rem; }
+    .table-overview { padding: 1rem; }
+    .table-overview h3 { margin: 0 0 1rem 0; font-size: 1rem; font-weight: 600; }
+    .overview-list { display: flex; flex-direction: column; gap: 0.75rem; }
+    .overview-table-card { background: var(--bg-white); border-radius: var(--radius-sm); padding: 0.75rem 1rem; box-shadow: var(--shadow-soft); }
+    .overview-table-name { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .overview-guest-list { list-style: none; margin: 0; padding: 0; }
+    .overview-guest-item { font-size: 0.85rem; padding: 0.35rem 0.5rem; padding-left: 0.75rem; border-left: 3px solid; margin-bottom: 0.25rem; border-radius: 0 4px 4px 0; background: rgba(255,255,255,0.6); }
+    @media (max-width: 900px) { .app-layout { grid-template-columns: 1fr; grid-template-rows: auto 6px 1fr 6px auto; } .resizer { cursor: row-resize; } }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <h1>Wedding Seat Plan</h1>
+    <div class="undo-redo">
+      <button type="button" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
+      <button type="button" id="redoBtn" title="Redo (Ctrl+Y)">Redo</button>
+    </div>
+  </header>
+  <div class="app-layout">
+    <aside class="panel panel-left" id="panelLeft">
+      <div class="guest-panel">
+        <div class="guest-panel-config">
+          <div class="config-row"><label>Guests</label><input type="number" id="guestCount" min="2" max="200" value="10" /></div>
+          <div class="config-row"><label>Tables</label><input type="number" id="tableCount" min="1" max="50" value="4" /></div>
+        </div>
+        <div class="guest-panel-header"><h3>Guest List</h3></div>
+        <div class="guest-list-scroll" id="guestList"></div>
+        <div class="groups-section">
+          <h4>Groups</h4>
+          <div class="add-group-row">
+            <input type="text" id="newGroupName" placeholder="New group name" />
+            <button type="button" id="addGroupBtn">Add</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <div class="resizer" id="resizerLeft" title="Drag to resize"></div>
+    <main class="panel panel-center">
+      <div class="venue" id="venue">
+        <div class="venue-canvas" id="venueCanvas">
+          <div class="venue-inner" id="venueInner">
+            <div id="tableContainer"></div>
+          </div>
+          <div class="unassigned-zone" id="unassignedZone">
+            <span class="unassigned-label">Unassigned</span>
+            <div class="unassigned-guests" id="unassignedGuests"></div>
+          </div>
+        </div>
+        <div class="venue-zoom-controls">
+          <button type="button" id="venueZoomIn" title="Zoom in">+</button>
+          <button type="button" id="venueZoomOut" title="Zoom out">−</button>
+        </div>
+      </div>
+    </main>
+    <div class="resizer" id="resizerRight" title="Drag to resize"></div>
+    <aside class="panel panel-right" id="panelRight">
+      <div id="tableSettingsPanel" class="table-settings" style="display:none;">
+        <h3>Table settings</h3>
+        <div class="field"><label>Name</label><input type="text" id="settingName" /></div>
+        <div class="field"><label>Shape</label><select id="settingShape"><option value="round">Round</option><option value="rectangular">Rectangular</option></select></div>
+        <div class="field" style="font-size:0.8rem;color:var(--text-muted);">Resize by dragging the handle on the table.</div>
+        <div class="field" style="display:flex;align-items:center;gap:0.5rem;">
+          <label style="margin:0;">Seats</label>
+          <input type="number" id="settingSeats" min="1" max="20" style="width:4rem;" />
+          <button type="button" class="remove-seat-btn" id="removeSeatBtn" title="Remove last seat">−</button>
+          <button type="button" class="add-seat-btn" id="addSeatBtn" title="Add a seat">+</button>
+        </div>
+        <div class="field"><button type="button" id="alignChairsBtn" style="padding:0.4rem 0.75rem;font-size:0.85rem;">Align chairs</button></div>
+        <div class="field"><label>Chairs on</label><select id="settingChairLayout">
+          <option value="around">Around table</option>
+          <option value="top">One side (top)</option>
+          <option value="bottom">One side (bottom)</option>
+          <option value="left">One side (left)</option>
+          <option value="right">One side (right)</option>
+          <option value="top-bottom">Two sides (top + bottom)</option>
+          <option value="left-right">Two sides (left + right)</option>
+        </select></div>
+      </div>
+      <div class="table-overview">
+        <h3>Seating Overview</h3>
+        <div class="overview-list" id="overviewList"></div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'wedding-seatplan-data';
+    const CHAIR_LAYOUTS = ['around', 'top', 'bottom', 'left', 'right', 'top-bottom', 'left-right'];
+    const DEFAULT_GROUPS = [
+      { id: 'brides_family', label: "Bride's family", color: '#F8E8EE' },
+      { id: 'grooms_family', label: "Groom's family", color: '#E8F0F8' },
+      { id: 'friends', label: 'Friends', color: '#E8F4F8' },
+      { id: 'coworkers', label: 'Coworkers', color: '#E8F5E9' },
+      { id: 'maid_of_honor', label: 'Maid of honor', color: '#F3E8F5' },
+      { id: 'best_man', label: 'Best man', color: '#E8F4F0' },
+      { id: 'other', label: 'Other', color: '#F5F0E8' }
+    ];
+    function getGroups() { return state.guestGroups || DEFAULT_GROUPS; }
+    function getGroupColor(id) { const g = getGroups().find(x => x.id === id); return g ? g.color : '#F5F0E8'; }
+
+    function defaultGuests(n) {
+      const list = [
+        { id: 'guest-1', name: 'Bride', group: 'brides_family', isBride: true, isGroom: false, tableId: null, isChild: false },
+        { id: 'guest-2', name: 'Groom', group: 'grooms_family', isBride: false, isGroom: true, tableId: null, isChild: false }
+      ];
+      for (let i = 2; i < n; i++) list.push({ id: 'guest-' + (i + 1), name: 'Guest ' + (i + 1), group: 'other', isBride: false, isGroom: false, tableId: null, isChild: false });
+      return list;
+    }
+    function defaultTables(n) {
+      return Array.from({ length: n }, (_, i) => ({
+        id: 'table-' + (i + 1), name: 'Table ' + (i + 1), shape: 'round', capacity: 8,
+        width: 140, height: 85, radius: 75, chairLayout: 'around',
+        seats: [], seatPositions: [], x: 80 + (i % 4) * 320, y: 60 + Math.floor(i / 4) * 280
+      }));
+    }
+    function getDefaultSeatPositions(table, count) {
+      const cap = count || table.capacity;
+      const layout = table.chairLayout || 'around';
+      const w = table.shape === 'round' ? table.radius * 2 : table.width;
+      const h = table.shape === 'round' ? table.radius * 2 : table.height;
+      const positions = [];
+      const pad = 28;
+      if (layout === 'top') for (let i = 0; i < cap; i++) positions.push({ x: (i / Math.max(1, cap - 1)) * w * 0.8 - w * 0.4, y: -h / 2 - pad });
+      else if (layout === 'bottom') for (let i = 0; i < cap; i++) positions.push({ x: (i / Math.max(1, cap - 1)) * w * 0.8 - w * 0.4, y: h / 2 + pad });
+      else if (layout === 'left') for (let i = 0; i < cap; i++) positions.push({ x: -w / 2 - pad, y: (i / Math.max(1, cap - 1)) * h * 0.8 - h * 0.4 });
+      else if (layout === 'right') for (let i = 0; i < cap; i++) positions.push({ x: w / 2 + pad, y: (i / Math.max(1, cap - 1)) * h * 0.8 - h * 0.4 });
+      else if (layout === 'top-bottom') {
+        const half = Math.ceil(cap / 2);
+        for (let i = 0; i < half; i++) positions.push({ x: (i / Math.max(1, half - 1)) * w * 0.8 - w * 0.4, y: -h / 2 - pad });
+        for (let i = half; i < cap; i++) positions.push({ x: ((i - half) / Math.max(1, cap - half - 1)) * w * 0.8 - w * 0.4, y: h / 2 + pad });
+      } else if (layout === 'left-right') {
+        const half = Math.ceil(cap / 2);
+        for (let i = 0; i < half; i++) positions.push({ x: -w / 2 - pad, y: (i / Math.max(1, half - 1)) * h * 0.8 - h * 0.4 });
+        for (let i = half; i < cap; i++) positions.push({ x: w / 2 + pad, y: ((i - half) / Math.max(1, cap - half - 1)) * h * 0.8 - h * 0.4 });
+      } else if (table.shape === 'rectangular' && layout === 'around') {
+        const perimeter = 2 * (w + h);
+        const halfW = w / 2, halfH = h / 2;
+        for (let i = 0; i < cap; i++) {
+          const t = (i / cap) * perimeter;
+          if (t < w) positions.push({ x: halfW - w + t, y: -halfH - pad });
+          else if (t < w + h) positions.push({ x: halfW + pad, y: -halfH + (t - w) });
+          else if (t < w * 2 + h) positions.push({ x: halfW - (t - w - h), y: halfH + pad });
+          else positions.push({ x: -halfW - pad, y: halfH - (t - w * 2 - h) });
+        }
+      } else {
+        for (let i = 0; i < cap; i++) {
+          const a = (i / cap) * 2 * Math.PI - Math.PI / 2;
+          const r = Math.max(w, h) / 2 + pad;
+          positions.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
+        }
+      }
+      return positions;
+    }
+    function migrateTable(t) {
+      if (!t.seats && t.guests) {
+        const cap = Math.max(t.capacity || 8, t.guests.length);
+        t.capacity = cap;
+        t.seats = [...t.guests];
+        while (t.seats.length < cap) t.seats.push(null);
+        delete t.guests;
+      } else if (!t.seats) {
+        t.capacity = t.capacity || 8;
+        t.seats = Array(t.capacity).fill(null);
+      }
+      t.capacity = t.capacity || 8;
+      while (t.seats.length < t.capacity) t.seats.push(null);
+      while (t.seats.length > t.capacity) t.seats.pop();
+      if (t.x == null) t.x = 80;
+      if (t.y == null) t.y = 60;
+      if (t.width == null) t.width = 140;
+      if (t.height == null) t.height = 85;
+      if (t.radius == null) t.radius = 75;
+      if (!t.chairLayout || !CHAIR_LAYOUTS.includes(t.chairLayout)) t.chairLayout = 'around';
+      if (t.shape === 'square') t.shape = 'rectangular';
+      if (!t.seatPositions || t.seatPositions.length !== t.capacity) {
+        t.seatPositions = getDefaultSeatPositions(t, t.capacity);
+        while (t.seatPositions.length < t.capacity) t.seatPositions.push({ x: 0, y: 0 });
+        t.seatPositions = t.seatPositions.slice(0, t.capacity);
+      }
+      return t;
+    }
+
+    let state = { guestCount: 10, tableCount: 4, guests: defaultGuests(10), tables: defaultTables(4), guestGroups: DEFAULT_GROUPS.slice() };
+    let selectedTableId = null;
+    let venueZoom = 1.35;
+    let venuePanX = 0;
+    let venuePanY = 0;
+    let venuePanning = false;
+    let venueDidPan = false;
+    const HISTORY_MAX = 50;
+    let stateHistory = [];
+    let stateHistoryIndex = -1;
+
+    function saveToHistory() {
+      stateHistory = stateHistory.slice(0, stateHistoryIndex + 1);
+      if (stateHistory.length >= HISTORY_MAX) { stateHistory.shift(); stateHistoryIndex--; }
+      stateHistory.push(JSON.parse(JSON.stringify(state)));
+      stateHistoryIndex = stateHistory.length - 1;
+      document.getElementById('undoBtn').disabled = stateHistoryIndex <= 0;
+      document.getElementById('redoBtn').disabled = stateHistoryIndex >= stateHistory.length - 1;
+    }
+    function undo() {
+      if (stateHistoryIndex <= 0) return;
+      stateHistoryIndex--;
+      state = JSON.parse(JSON.stringify(stateHistory[stateHistoryIndex]));
+      if (selectedTableId && !state.tables.find(t => t.id === selectedTableId)) selectedTableId = null;
+      saveState();
+      renderAll();
+      document.getElementById('undoBtn').disabled = stateHistoryIndex <= 0;
+      document.getElementById('redoBtn').disabled = stateHistoryIndex >= stateHistory.length - 1;
+    }
+    function redo() {
+      if (stateHistoryIndex >= stateHistory.length - 1) return;
+      stateHistoryIndex++;
+      state = JSON.parse(JSON.stringify(stateHistory[stateHistoryIndex]));
+      if (selectedTableId && !state.tables.find(t => t.id === selectedTableId)) selectedTableId = null;
+      saveState();
+      renderAll();
+      document.getElementById('undoBtn').disabled = stateHistoryIndex <= 0;
+      document.getElementById('redoBtn').disabled = stateHistoryIndex >= stateHistory.length - 1;
+    }
+
+    function loadState() {
+      try {
+        const s = localStorage.getItem(STORAGE_KEY);
+        if (s) {
+          state = JSON.parse(s);
+          if (!state.guestGroups || state.guestGroups.length === 0) state.guestGroups = DEFAULT_GROUPS.slice();
+          state.guests.forEach(g => {
+            if (g.isChild === undefined) g.isChild = false;
+            if (g.group === 'family') g.group = 'brides_family';
+          });
+          const usedGroups = new Set(state.guests.map(g => g.group));
+          usedGroups.forEach(id => {
+            if (!state.guestGroups.find(gr => gr.id === id)) state.guestGroups.push({ id, label: id.replace(/_/g, ' '), color: '#F5F0E8' });
+          });
+          state.tables = state.tables.map(migrateTable);
+          if (state.guests[0]) state.guests[0].isBride = true;
+          if (state.guests[1]) state.guests[1].isGroom = true;
+        }
+      } catch (e) {}
+    }
+    function saveState() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+    }
+
+    function setGuestCount(n) {
+      n = Math.max(2, parseInt(n, 10) || 2);
+      const prev = state.guests;
+      const bride = prev[0] && prev[0].isBride ? prev[0] : { id: 'guest-1', name: 'Bride', group: 'brides_family', isBride: true, isGroom: false, tableId: null, isChild: false };
+      const groom = prev[1] && prev[1].isGroom ? prev[1] : { id: 'guest-2', name: 'Groom', group: 'grooms_family', isBride: false, isGroom: true, tableId: null, isChild: false };
+      const rest = [];
+      for (let i = 2; i < n; i++) rest.push(prev[i] || { id: 'guest-' + (i + 1), name: 'Guest ' + (i + 1), group: 'other', isBride: false, isGroom: false, tableId: null, isChild: false });
+      state.guestCount = n;
+      state.guests = [bride, groom, ...rest];
+      saveState();
+      saveToHistory();
+      renderAll();
+    }
+    function setTableCount(n) {
+      n = Math.max(1, parseInt(n, 10) || 1);
+      const tables = [...state.tables];
+      while (tables.length < n) tables.push({
+        id: 'table-' + Date.now() + '-' + tables.length, name: 'Table ' + (tables.length + 1), shape: 'round', capacity: 8,
+        width: 140, height: 85, radius: 75, chairLayout: 'around', seatPositions: [],
+        seats: Array(8).fill(null), x: 80 + (tables.length % 4) * 320, y: 60 + Math.floor(tables.length / 4) * 280
+      });
+      const newTables = tables.slice(0, n).map(migrateTable);
+      const allSeatIds = new Set(newTables.flatMap(t => t.seats).filter(Boolean));
+      state.guests.forEach(g => { if (!allSeatIds.has(g.id)) g.tableId = null; });
+      state.tableCount = n;
+      state.tables = newTables;
+      saveState();
+      saveToHistory();
+      renderAll();
+    }
+    function updateGuest(id, updates) {
+      const g = state.guests.find(x => x.id === id);
+      if (g) Object.assign(g, updates);
+      saveState();
+      saveToHistory();
+      renderCenterAndRight();
+    }
+    function updateTable(id, updates) {
+      const t = state.tables.find(x => x.id === id);
+      if (t) {
+        const prevCap = t.capacity;
+        const prevPositionsLen = (t.seatPositions && t.seatPositions.length) || 0;
+        Object.assign(t, updates);
+        if (updates.capacity != null) {
+          const cap = Math.max(1, parseInt(updates.capacity, 10) || 1);
+          t.capacity = cap;
+          while (t.seats.length > cap) {
+            const removedId = t.seats.pop();
+            const g = removedId ? state.guests.find(x => x.id === removedId) : null;
+            if (g) g.tableId = null;
+          }
+          while (t.seats.length < cap) t.seats.push(null);
+          if (!t.seatPositions || t.seatPositions.length === 0) {
+            t.seatPositions = getDefaultSeatPositions(t, cap);
+          } else if (cap > prevCap) {
+            t.seatPositions = t.seatPositions.slice(0, cap);
+            while (t.seatPositions.length < cap) {
+              const oneNew = getDefaultSeatPositions(t, t.seatPositions.length + 1);
+              t.seatPositions.push(oneNew[t.seatPositions.length]);
+            }
+          } else if (cap < prevCap) {
+            t.seatPositions = t.seatPositions.slice(0, cap);
+          }
+          while (t.seatPositions.length < cap) t.seatPositions.push({ x: 0, y: 0 });
+          t.seatPositions = t.seatPositions.slice(0, cap);
+        }
+        if (updates.chairLayout != null) {
+          t.seatPositions = getDefaultSeatPositions(t, t.capacity);
+        }
+        if (updates.width != null) t.width = Math.max(40, parseInt(updates.width, 10) || 80);
+        if (updates.height != null) t.height = Math.max(40, parseInt(updates.height, 10) || 60);
+        if (updates.radius != null) t.radius = Math.max(20, parseInt(updates.radius, 10) || 50);
+      }
+      saveState();
+      saveToHistory();
+      renderCenterAndRight();
+    }
+    function removeChair(tableId, seatIndex) {
+      const t = state.tables.find(x => x.id === tableId);
+      if (!t || t.capacity <= 1) return;
+      const guestId = t.seats[seatIndex] || null;
+      if (guestId) {
+        const g = state.guests.find(x => x.id === guestId);
+        if (g) g.tableId = null;
+      }
+      t.seats.splice(seatIndex, 1);
+      if (t.seatPositions && t.seatPositions.length > seatIndex) t.seatPositions.splice(seatIndex, 1);
+      t.capacity = t.seats.length;
+      saveState();
+      saveToHistory();
+      renderCenterAndRight();
+    }
+    function assignGuestToSeat(guestId, tableId, seatIndex, sourceTableId, sourceSeatIndex) {
+      const fromSeat = sourceTableId != null && sourceSeatIndex != null;
+      const sourceTable = fromSeat ? state.tables.find(t => t.id === sourceTableId) : null;
+      const targetTable = tableId != null ? state.tables.find(t => t.id === tableId) : null;
+      const targetGuestId = targetTable && seatIndex != null ? targetTable.seats[seatIndex] : null;
+
+      state.tables.forEach(t => { t.seats = t.seats.map(id => id === guestId ? null : id); });
+      const g = state.guests.find(x => x.id === guestId);
+      if (g) g.tableId = tableId;
+
+      if (tableId != null && seatIndex != null && targetTable) {
+        if (fromSeat && sourceTable && targetGuestId && (sourceTableId !== tableId || sourceSeatIndex !== seatIndex)) {
+          sourceTable.seats[sourceSeatIndex] = targetGuestId;
+          const other = state.guests.find(x => x.id === targetGuestId);
+          if (other) other.tableId = sourceTableId;
+        } else if (targetGuestId) {
+          const displaced = state.guests.find(x => x.id === targetGuestId);
+          if (displaced) displaced.tableId = null;
+        }
+        targetTable.seats[seatIndex] = guestId;
+      }
+      saveState();
+      saveToHistory();
+      requestAnimationFrame(() => renderCenterAndRight());
+    }
+    function applyVenueTransform() {
+      const el = document.getElementById('venueCanvas');
+      if (el) el.style.transform = `translate(${venuePanX}px, ${venuePanY}px) scale(${venueZoom})`;
+    }
+    function setSelectedTable(id) {
+      selectedTableId = id;
+      const panel = document.getElementById('tableSettingsPanel');
+      if (!id) { panel.style.display = 'none'; return; }
+      panel.style.display = 'block';
+      const t = state.tables.find(x => x.id === id);
+      if (!t) return;
+      document.getElementById('settingName').value = t.name;
+      document.getElementById('settingShape').value = t.shape;
+      document.getElementById('settingSeats').value = t.capacity;
+      document.getElementById('settingChairLayout').value = t.chairLayout || 'around';
+    }
+
+    function escapeHtml(s) { const el = document.createElement('span'); el.textContent = s; return el.innerHTML; }
+
+    function renderGuestList() {
+      const container = document.getElementById('guestList');
+      container.innerHTML = '';
+      state.guests.forEach((g, i) => {
+        const div = document.createElement('div');
+        div.className = 'guest-list-item' + (i < 2 ? ' special-row' : '') + (g.tableId ? ' assigned' : '');
+        div.style.borderLeftColor = getGroupColor(g.group);
+        div.draggable = true;
+        div.dataset.guestId = g.id;
+        const label = i === 0 ? '👰 Bride' : i === 1 ? '🤵 Groom' : '';
+        div.innerHTML = `
+          <div class="guest-drag-handle">⋮⋮</div>
+          <div class="guest-content">
+            ${i < 2 ? '<span class="special-label">' + label + '</span>' : ''}
+            <input type="text" class="guest-name-input" value="${escapeHtml(g.name)}" data-id="${g.id}" />
+            <select class="guest-group-select" data-id="${g.id}">
+              ${getGroups().map(gr => `<option value="${gr.id}" ${g.group === gr.id ? 'selected' : ''}>${gr.label}</option>`).join('')}
+              <option value="__add_group__">➕ Add new group…</option>
+            </select>
+            <div class="guest-child-wrap"><input type="checkbox" id="child-${g.id}" ${g.isChild ? 'checked' : ''} /><label for="child-${g.id}">Child</label></div>
+          </div>`;
+        div.addEventListener('dragstart', e => {
+          e.dataTransfer.setData('text/plain', g.id);
+          e.dataTransfer.effectAllowed = 'move';
+          div.classList.add('dragging');
+        });
+        div.addEventListener('dragend', () => div.classList.remove('dragging'));
+        div.querySelector('.guest-name-input').addEventListener('input', e => updateGuest(g.id, { name: e.target.value }));
+        div.querySelector('.guest-group-select').addEventListener('change', e => {
+          const val = e.target.value;
+          if (val === '__add_group__') {
+            e.target.value = g.group;
+            document.getElementById('newGroupName').focus();
+            document.getElementById('newGroupName').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            return;
+          }
+          updateGuest(g.id, { group: val });
+        });
+        div.querySelector('.guest-child-wrap input').addEventListener('change', e => updateGuest(g.id, { isChild: e.target.checked }));
+        container.appendChild(div);
+      });
+    }
+
+    function renderCenter() {
+      const container = document.getElementById('tableContainer');
+      container.innerHTML = '';
+      const guestMap = Object.fromEntries(state.guests.map(g => [g.id, g]));
+
+      state.tables.forEach(table => {
+        if (!table.seatPositions || table.seatPositions.length !== table.capacity) {
+          table.seatPositions = getDefaultSeatPositions(table, table.capacity);
+          while (table.seatPositions.length < table.capacity) table.seatPositions.push({ x: 0, y: 0 });
+          table.seatPositions = table.seatPositions.slice(0, table.capacity);
+        }
+        const wrap = document.createElement('div');
+        wrap.className = 'table-wrapper table-shape-' + table.shape;
+        wrap.style.left = table.x + 'px';
+        wrap.style.top = table.y + 'px';
+        wrap.dataset.tableId = table.id;
+        if (selectedTableId === table.id) wrap.classList.add('selected');
+
+        const isRound = table.shape === 'round';
+        const w = isRound ? table.radius * 2 : table.width;
+        const h = isRound ? table.radius * 2 : table.height;
+
+        wrap.innerHTML = `
+          <div class="table-shape-body" style="width:${w}px;height:${h}px;">
+            <span class="table-label" data-table-id="${table.id}">${escapeHtml(table.name)}</span>
+          </div>
+          <div class="table-seats-wrap" style="width:${w}px;height:${h}px;"></div>`;
+        const body = wrap.querySelector('.table-shape-body');
+        const seatsWrap = wrap.querySelector('.table-seats-wrap');
+        body.addEventListener('click', e => {
+          if (!e.target.classList.contains('table-label')) return;
+          e.stopPropagation();
+          e.preventDefault();
+          const span = e.target;
+          const tableId = span.dataset.tableId;
+          const t = state.tables.find(x => x.id === tableId);
+          if (!t) return;
+          const input = document.createElement('input');
+          input.className = 'table-label-input';
+          input.value = t.name;
+          input.type = 'text';
+          span.replaceWith(input);
+          input.focus();
+          input.select();
+          function save() {
+            t.name = input.value.trim() || t.name;
+            saveState();
+            saveToHistory();
+            const newSpan = document.createElement('span');
+            newSpan.className = 'table-label';
+            newSpan.dataset.tableId = tableId;
+            newSpan.textContent = t.name;
+            input.replaceWith(newSpan);
+          }
+          input.addEventListener('blur', save);
+          input.addEventListener('keydown', ev => { if (ev.key === 'Enter') input.blur(); });
+        });
+
+        if (selectedTableId === table.id) {
+          const resizeHandle = document.createElement('div');
+          resizeHandle.className = 'table-resize-handle' + (isRound ? ' round-handle' : '');
+          resizeHandle.title = 'Drag to resize table';
+          if (isRound) {
+            resizeHandle.style.left = (w - 5) + 'px';
+            resizeHandle.style.top = (h / 2 - 5) + 'px';
+          } else {
+            resizeHandle.style.left = (w - 5) + 'px';
+            resizeHandle.style.top = (h - 5) + 'px';
+          }
+          resizeHandle.addEventListener('mousedown', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            let startX = e.clientX, startY = e.clientY, startR = table.radius, startW = table.width, startH = table.height;
+            function move(ev) {
+              if (isRound) {
+                const dx = ev.clientX - startX;
+                table.radius = Math.max(25, Math.min(200, startR + dx / 2));
+              } else {
+                table.width = Math.max(50, startW + ev.clientX - startX);
+                table.height = Math.max(40, startH + ev.clientY - startY);
+              }
+              const nw = isRound ? table.radius * 2 : table.width;
+              const nh = isRound ? table.radius * 2 : table.height;
+              body.style.width = nw + 'px';
+              body.style.height = nh + 'px';
+              seatsWrap.style.width = nw + 'px';
+              seatsWrap.style.height = nh + 'px';
+              if (isRound) { resizeHandle.style.left = (nw - 5) + 'px'; resizeHandle.style.top = (nh / 2 - 5) + 'px'; }
+              else { resizeHandle.style.left = (nw - 5) + 'px'; resizeHandle.style.top = (nh - 5) + 'px'; }
+              saveState();
+            }
+            function up() {
+              document.removeEventListener('mousemove', move);
+              document.removeEventListener('mouseup', up);
+              saveToHistory();
+            }
+            document.addEventListener('mousemove', move);
+            document.addEventListener('mouseup', up);
+          });
+          body.appendChild(resizeHandle);
+          const seatBtns = document.createElement('div');
+          seatBtns.className = 'seat-btns';
+          const addBtn = document.createElement('button');
+          addBtn.className = 'add-seat-btn';
+          addBtn.type = 'button';
+          addBtn.textContent = '+';
+          addBtn.title = 'Add seat';
+          addBtn.addEventListener('click', e => { e.stopPropagation(); updateTable(table.id, { capacity: table.capacity + 1 }); });
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'remove-seat-btn';
+          removeBtn.type = 'button';
+          removeBtn.textContent = '−';
+          removeBtn.title = 'Remove last seat';
+          removeBtn.disabled = table.capacity <= 1;
+          removeBtn.addEventListener('click', e => { e.stopPropagation(); if (table.capacity > 1) removeChair(table.id, table.capacity - 1); });
+          seatBtns.appendChild(removeBtn);
+          seatBtns.appendChild(addBtn);
+          body.appendChild(seatBtns);
+        }
+
+        body.addEventListener('click', e => { if (!e.target.classList.contains('table-label') && !e.target.classList.contains('table-label-input')) { e.stopPropagation(); setSelectedTable(table.id); renderCenterAndRight(); } });
+        body.addEventListener('mousedown', e => {
+          if (e.target.closest('.seat')) return;
+          if (e.target.closest('.table-label')) return;
+          if (e.target.closest('.table-resize-handle')) return;
+          e.preventDefault();
+          wrap.classList.add('dragging-table');
+          let startX = e.clientX, startY = e.clientY, startLeft = table.x, startTop = table.y;
+          function move(ev) {
+            table.x = Math.max(0, startLeft + ev.clientX - startX);
+            table.y = Math.max(0, startTop + ev.clientY - startY);
+            wrap.style.left = table.x + 'px';
+            wrap.style.top = table.y + 'px';
+          }
+          function up() {
+            wrap.classList.remove('dragging-table');
+            document.removeEventListener('mousemove', move);
+            document.removeEventListener('mouseup', up);
+            saveState();
+            saveToHistory();
+          }
+          document.addEventListener('mousemove', move);
+          document.addEventListener('mouseup', up);
+        });
+
+        const seats = Array.from({ length: table.capacity }, (_, i) => table.seats[i] || null);
+        const positions = table.seatPositions || getDefaultSeatPositions(table, table.capacity);
+        seats.forEach((guestId, idx) => {
+          const pos = positions[idx] || { x: 0, y: 0 };
+          const seat = document.createElement('div');
+          seat.className = 'seat ' + (guestId ? 'filled' : 'empty');
+          seat.dataset.tableId = table.id;
+          seat.dataset.seatIndex = idx;
+          seat.style.left = '50%';
+          seat.style.top = '50%';
+          seat.style.transform = 'translate(calc(-50% + ' + (pos.x || 0) + 'px), calc(-50% + ' + (pos.y || 0) + 'px))';
+          seat.innerHTML = '<span class="seat-grip" title="Drag to move chair">⋮⋮</span><span class="seat-label"></span><button type="button" class="seat-delete-btn" title="Remove this chair">×</button>';
+          const labelEl = seat.querySelector('.seat-label');
+          seat.querySelector('.seat-delete-btn').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); removeChair(table.id, idx); });
+          const g = guestId ? guestMap[guestId] : null;
+          labelEl.textContent = g ? (g.isBride ? '👰 ' : '') + (g.isGroom ? '🤵 ' : '') + (g.isChild ? '👶 ' : '') + g.name : 'Seat ' + (idx + 1);
+          if (g) seat.style.background = getGroupColor(g.group);
+          let gripDragging = false;
+          if (guestId) {
+            seat.draggable = true;
+            seat.addEventListener('dragstart', e => {
+              e.stopPropagation();
+              if (gripDragging) { e.preventDefault(); return; }
+              e.dataTransfer.setData('text/plain', guestId);
+              e.dataTransfer.setData('application/json', JSON.stringify({ guestId, sourceTableId: table.id, sourceSeatIndex: idx }));
+              e.dataTransfer.effectAllowed = 'move';
+              seat.classList.add('dragging');
+            });
+            seat.addEventListener('dragend', () => seat.classList.remove('dragging'));
+          }
+          const grip = seat.querySelector('.seat-grip');
+          grip.addEventListener('mousedown', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            gripDragging = true;
+            const startX = e.clientX, startY = e.clientY;
+            const startPos = { x: pos.x || 0, y: pos.y || 0 };
+            function move(ev) {
+              pos.x = startPos.x + ev.clientX - startX;
+              pos.y = startPos.y + ev.clientY - startY;
+              seat.style.transform = 'translate(calc(-50% + ' + pos.x + 'px), calc(-50% + ' + pos.y + 'px))';
+              saveState();
+            }
+            function up() {
+              document.removeEventListener('mousemove', move);
+              document.removeEventListener('mouseup', up);
+              gripDragging = false;
+              saveToHistory();
+            }
+            document.addEventListener('mousemove', move);
+            document.addEventListener('mouseup', up);
+          });
+          seat.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; seat.classList.add('drag-over'); });
+          seat.addEventListener('dragleave', () => seat.classList.remove('drag-over'));
+          seat.addEventListener('drop', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            seat.classList.remove('drag-over');
+            const id = e.dataTransfer.getData('text/plain');
+            let src = null;
+            try { src = JSON.parse(e.dataTransfer.getData('application/json') || 'null'); } catch (_) {}
+            if (id) assignGuestToSeat(id, table.id, idx, src && src.sourceTableId, src && src.sourceSeatIndex != null ? src.sourceSeatIndex : undefined);
+          });
+          seat.addEventListener('click', e => e.stopPropagation());
+          seatsWrap.appendChild(seat);
+        });
+
+        wrap.addEventListener('dragover', e => e.preventDefault());
+        wrap.addEventListener('drop', e => e.preventDefault());
+        container.appendChild(wrap);
+      });
+
+      const unassigned = state.guests.filter(g => !g.tableId);
+      document.getElementById('unassignedGuests').innerHTML = unassigned.map(g => `<span class="unassigned-chip">${(g.isBride ? '👰 ' : '') + (g.isGroom ? '🤵 ' : '') + (g.isChild ? '👶 ' : '') + escapeHtml(g.name)}</span>`).join('') || '';
+    }
+
+    function bindTableSettings() {
+      const panel = document.getElementById('tableSettingsPanel');
+      if (!selectedTableId) return;
+      const t = state.tables.find(x => x.id === selectedTableId);
+      if (!t) return;
+      panel.querySelector('#settingName').onchange = e => updateTable(t.id, { name: e.target.value });
+      panel.querySelector('#settingShape').onchange = e => { updateTable(t.id, { shape: e.target.value }); setSelectedTable(t.id); };
+      panel.querySelector('#settingSeats').onchange = e => updateTable(t.id, { capacity: e.target.value });
+      panel.querySelector('#settingChairLayout').onchange = e => updateTable(t.id, { chairLayout: e.target.value });
+      const removeBtn = document.getElementById('removeSeatBtn');
+      if (removeBtn) removeBtn.disabled = t.capacity <= 1;
+    }
+
+    function initUnassignedDrop() {
+      const zone = document.getElementById('unassignedZone');
+      zone.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; zone.classList.add('drag-over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        const id = e.dataTransfer.getData('text/plain');
+        let src = null;
+        try { src = JSON.parse(e.dataTransfer.getData('application/json') || 'null'); } catch (_) {}
+        if (id) assignGuestToSeat(id, null, null, src && src.sourceTableId, src && src.sourceSeatIndex);
+      });
+    }
+
+    function renderRight() {
+      const guestMap = Object.fromEntries(state.guests.map(g => [g.id, g]));
+      const unassigned = state.guests.filter(g => !g.tableId);
+      document.getElementById('overviewList').innerHTML =
+        state.tables.map(table => {
+          const list = table.seats.map(id => id ? guestMap[id] : null).filter(Boolean).map(g => `<li class="overview-guest-item" style="border-left-color:${getGroupColor(g.group)}">${(g.isBride ? '👰 ' : '') + (g.isGroom ? '🤵 ' : '') + (g.isChild ? '👶 ' : '') + escapeHtml(g.name)}</li>`).join('');
+          return `<div class="overview-table-card"><div class="overview-table-name">${escapeHtml(table.name)}</div><ul class="overview-guest-list">${list || '<li class="overview-guest-item" style="border-left-color:#F5F0E8;opacity:0.7">No guests yet</li>'}</ul></div>`;
+        }).join('') +
+        `<div class="overview-table-card" style="background:var(--pastel-beige)"><div class="overview-table-name">Unassigned</div><ul class="overview-guest-list">${unassigned.map(g => `<li class="overview-guest-item" style="border-left-color:${getGroupColor(g.group)}">${(g.isBride ? '👰 ' : '') + (g.isGroom ? '🤵 ' : '') + (g.isChild ? '👶 ' : '') + escapeHtml(g.name)}</li>`).join('') || '<li style="opacity:0.7">All assigned</li>'}</ul></div>`;
+      if (selectedTableId) {
+        setSelectedTable(selectedTableId);
+        bindTableSettings();
+      }
+    }
+
+    function renderCenterAndRight() { renderCenter(); renderRight(); }
+    function renderAll() {
+      document.getElementById('guestCount').value = state.guestCount;
+      document.getElementById('tableCount').value = state.tableCount;
+      document.getElementById('guestCount').onchange = e => setGuestCount(e.target.value);
+      document.getElementById('tableCount').onchange = e => setTableCount(e.target.value);
+      renderGuestList();
+      renderCenter();
+      renderRight();
+      bindTableSettings();
+    }
+
+    function initResizers() {
+      const root = document.documentElement;
+      const rLeft = document.getElementById('resizerLeft');
+      const rRight = document.getElementById('resizerRight');
+      rLeft.addEventListener('mousedown', e => {
+        e.preventDefault();
+        let startX = e.clientX, startLeft = parseInt(getComputedStyle(root).getPropertyValue('--left-width')) || 280;
+        function move(e) { const w = Math.max(180, Math.min(500, startLeft + e.clientX - startX)); root.style.setProperty('--left-width', w + 'px'); }
+        function up() { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); }
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', up);
+      });
+      rRight.addEventListener('mousedown', e => {
+        e.preventDefault();
+        let startX = e.clientX, startRight = parseInt(getComputedStyle(root).getPropertyValue('--right-width')) || 280;
+        function move(e) { const w = Math.max(180, Math.min(500, startRight + startX - e.clientX)); root.style.setProperty('--right-width', w + 'px'); }
+        function up() { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); }
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', up);
+      });
+    }
+
+    document.getElementById('settingName').addEventListener('change', e => { if (selectedTableId) updateTable(selectedTableId, { name: e.target.value }); });
+    document.getElementById('settingShape').addEventListener('change', e => { if (selectedTableId) { updateTable(selectedTableId, { shape: e.target.value }); setSelectedTable(selectedTableId); renderCenterAndRight(); } });
+    document.getElementById('settingSeats').addEventListener('change', e => { if (selectedTableId) updateTable(selectedTableId, { capacity: e.target.value }); });
+    document.getElementById('settingChairLayout').addEventListener('change', e => { if (selectedTableId) updateTable(selectedTableId, { chairLayout: e.target.value }); });
+    document.getElementById('addSeatBtn').addEventListener('click', () => {
+      if (selectedTableId) { const t = state.tables.find(x => x.id === selectedTableId); if (t) updateTable(t.id, { capacity: t.capacity + 1 }); }
+    });
+    document.getElementById('removeSeatBtn').addEventListener('click', () => {
+      if (selectedTableId) { const t = state.tables.find(x => x.id === selectedTableId); if (t && t.capacity > 1) removeChair(t.id, t.capacity - 1); }
+    });
+    document.getElementById('alignChairsBtn').addEventListener('click', () => {
+      if (selectedTableId) { const t = state.tables.find(x => x.id === selectedTableId); if (t) { t.seatPositions = getDefaultSeatPositions(t, t.capacity); saveState(); saveToHistory(); renderCenterAndRight(); } }
+    });
+    document.getElementById('addGroupBtn').addEventListener('click', () => {
+      const input = document.getElementById('newGroupName');
+      const name = (input.value || '').trim();
+      if (!name) return;
+      const colors = ['#F8E8EE', '#E8F0F8', '#E8F4F8', '#E8F5E9', '#F3E8F5', '#E8F4F0', '#F5F0E8', '#FFF0E8'];
+      const id = 'group-' + Date.now();
+      state.guestGroups = state.guestGroups || [];
+      state.guestGroups.push({ id, label: name, color: colors[state.guestGroups.length % colors.length] });
+      input.value = '';
+      saveState();
+      saveToHistory();
+      renderGuestList();
+    });
+
+    loadState();
+    state.tables = state.tables.map(migrateTable);
+    stateHistory = [JSON.parse(JSON.stringify(state))];
+    stateHistoryIndex = 0;
+
+    document.getElementById('undoBtn').addEventListener('click', undo);
+    document.getElementById('redoBtn').addEventListener('click', redo);
+    document.addEventListener('keydown', e => {
+      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+      if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
+    });
+
+    renderAll();
+    document.getElementById('undoBtn').disabled = stateHistoryIndex <= 0;
+    document.getElementById('redoBtn').disabled = stateHistoryIndex >= stateHistory.length - 1;
+    initUnassignedDrop();
+    initResizers();
+    applyVenueTransform();
+
+    const venueEl = document.getElementById('venue');
+    venueEl.addEventListener('wheel', e => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.12 : 0.12;
+      venueZoom = Math.max(0.35, Math.min(2.5, venueZoom + delta));
+      applyVenueTransform();
+    }, { passive: false });
+
+    venueEl.addEventListener('mousedown', e => {
+      if (e.target.closest('.table-wrapper') || e.target.closest('.unassigned-zone') || e.target.closest('.venue-zoom-controls')) return;
+      venuePanning = true;
+      venueDidPan = false;
+      const startX = e.clientX - venuePanX;
+      const startY = e.clientY - venuePanY;
+      function move(ev) {
+        venueDidPan = true;
+        venuePanX = ev.clientX - startX;
+        venuePanY = ev.clientY - startY;
+        applyVenueTransform();
+      }
+      function up() {
+        venuePanning = false;
+        venueEl.classList.remove('panning');
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+      }
+      venueEl.classList.add('panning');
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+
+    venueEl.addEventListener('click', e => {
+      if (venueDidPan) { venueDidPan = false; return; }
+      if (!e.target.closest('.table-wrapper')) { selectedTableId = null; document.getElementById('tableSettingsPanel').style.display = 'none'; renderCenterAndRight(); }
+    });
+
+    document.getElementById('venueZoomIn').addEventListener('click', () => { venueZoom = Math.min(2.5, venueZoom + 0.2); applyVenueTransform(); });
+    document.getElementById('venueZoomOut').addEventListener('click', () => { venueZoom = Math.max(0.35, venueZoom - 0.2); applyVenueTransform(); });
+  </script>
+</body>
+</html>

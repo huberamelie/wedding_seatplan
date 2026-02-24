@@ -1,0 +1,67 @@
+.guest-panel {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.guest-panel-config {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: var(--pastel-beige);
+  border-radius: var(--radius-sm);
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.config-row label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.config-row input {
+  width: 4rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid rgba(92, 74, 61, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+}
+
+.guest-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.guest-panel-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.group-legend {
+  display: flex;
+  gap: 4px;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.guest-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}

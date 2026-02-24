@@ -1,0 +1,93 @@
+.table-wrapper {
+  background: var(--bg-white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 1rem;
+  min-width: 200px;
+  max-width: 280px;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.table-wrapper.drag-over {
+  box-shadow: 0 0 0 3px var(--pastel-pink);
+  transform: scale(1.02);
+}
+
+.table-config {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.table-name-input {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid rgba(92, 74, 61, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.table-shape-select {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid rgba(92, 74, 61, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  background: var(--bg-white);
+}
+
+.table-surface {
+  min-height: 120px;
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--pastel-beige);
+}
+
+.table-shape-round .table-surface {
+  border-radius: 50%;
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table-shape-rectangular .table-surface {
+  min-height: 100px;
+}
+
+.table-shape-square .table-surface {
+  aspect-ratio: 1;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table-guests {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 60px;
+}
+
+.table-guest-chip {
+  font-size: 0.8rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 999px;
+  font-weight: 500;
+  box-shadow: var(--shadow-soft);
+  white-space: nowrap;
+}
+
+.table-drop-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.table-guests:not(:empty) .table-drop-hint {
+  display: none;
+}
