@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     :root {
       --bg-cream: #FDF8F3;
@@ -28,9 +30,10 @@
     body { margin: 0; font-family: 'Quicksand', sans-serif; background: var(--bg-cream); color: var(--text-dark); min-height: 100vh; }
     .app-header { background: var(--bg-white); padding: 1rem 1.5rem; box-shadow: var(--shadow-soft); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
     .app-header h1 { margin: 0; font-size: 1.5rem; font-weight: 600; }
+    .header-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
     .undo-redo { display: flex; gap: 0.5rem; }
-    .undo-redo button { padding: 0.4rem 0.75rem; font-size: 0.85rem; border: 1px solid rgba(92,74,61,0.2); border-radius: var(--radius-sm); background: var(--bg-white); cursor: pointer; }
-    .undo-redo button:hover { background: var(--pastel-beige); }
+    .undo-redo button, .export-actions button { padding: 0.4rem 0.75rem; font-size: 0.85rem; border: 1px solid rgba(92,74,61,0.2); border-radius: var(--radius-sm); background: var(--bg-white); cursor: pointer; }
+    .undo-redo button:hover, .export-actions button:hover { background: var(--pastel-beige); }
     .undo-redo button:disabled { opacity: 0.5; cursor: not-allowed; }
     .app-layout {
       display: grid;
@@ -42,6 +45,10 @@
     .panel-left { border-right: 1px solid rgba(92, 74, 61, 0.08); min-width: 180px; }
     .panel-right { border-left: 1px solid rgba(92, 74, 61, 0.08); min-width: 180px; }
     .panel-center { background: var(--bg-cream); overflow: hidden; padding: 0; position: relative; }
+    .main-zoom-bar { position: absolute; top: 8px; right: 8px; z-index: 25; display: flex; align-items: center; gap: 6px; background: var(--bg-white); padding: 6px 10px; border-radius: var(--radius-sm); box-shadow: var(--shadow-card); border: 1px solid rgba(92,74,61,0.15); }
+    .main-zoom-bar button { width: 36px; height: 36px; border-radius: var(--radius-sm); border: 1px solid rgba(92,74,61,0.25); background: var(--pastel-beige); color: var(--text-dark); font-size: 1.4rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+    .main-zoom-bar button:hover { background: #e8dfd5; }
+    .main-zoom-bar span { font-size: 0.8rem; color: var(--text-muted); min-width: 3rem; text-align: center; }
     .resizer { background: rgba(92, 74, 61, 0.1); cursor: col-resize; flex-shrink: 0; }
     .resizer:hover { background: rgba(92, 74, 61, 0.2); }
     .guest-panel { padding: 1rem; }
@@ -53,8 +60,8 @@
     .guest-panel-header h3 { margin: 0; font-size: 1rem; font-weight: 600; }
     .guest-list-scroll { display: flex; flex-direction: column; gap: 0.5rem; max-height: calc(100vh - 280px); overflow-y: auto; }
     .guest-list-item { display: flex; align-items: stretch; background: var(--bg-white); border-radius: var(--radius-sm); border: 1px solid rgba(92, 74, 61, 0.1); border-left: 3px solid; padding: 0; box-shadow: var(--shadow-soft); }
-    .guest-list-item.assigned { opacity: 0.55; background: #f8f6f3; }
-    .guest-list-item.assigned .guest-name-input { color: var(--text-muted); }
+    .guest-list-item.assigned { background: #E8F4F8; border-left-color: #7EC8E3; }
+    .guest-list-item.assigned .guest-name-input { color: var(--text-dark); }
     .guest-drag-handle { padding: 0.5rem 0.4rem; cursor: grab; color: var(--text-muted); font-size: 0.75rem; background: rgba(92, 74, 61, 0.04); border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
     .guest-drag-handle:active { cursor: grabbing; }
     .guest-content { flex: 1; padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; }
@@ -70,6 +77,7 @@
     .venue-zoom-controls { position: absolute; right: 12px; bottom: 100px; z-index: 20; display: flex; flex-direction: column; gap: 4px; }
     .venue-zoom-controls button { width: 32px; height: 32px; border-radius: var(--radius-sm); border: 1px solid rgba(92,74,61,0.25); background: var(--bg-white); color: var(--text-dark); font-size: 1.2rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-soft); }
     .venue-zoom-controls button:hover { background: var(--pastel-beige); }
+    .venue-zoom-controls .zoom-hint { font-size: 0.65rem; color: var(--text-muted); text-align: center; margin-top: 2px; }
     .table-wrapper { position: absolute; cursor: default; }
     .table-wrapper.selected { outline: 3px solid var(--pastel-pink); outline-offset: 2px; z-index: 10; }
     .table-wrapper.dragging-table { cursor: grabbing; z-index: 100; }
@@ -128,9 +136,15 @@
 <body>
   <header class="app-header">
     <h1>Wedding Seat Plan</h1>
-    <div class="undo-redo">
-      <button type="button" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
-      <button type="button" id="redoBtn" title="Redo (Ctrl+Y)">Redo</button>
+    <div class="header-actions">
+      <div class="undo-redo">
+        <button type="button" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
+        <button type="button" id="redoBtn" title="Redo (Ctrl+Y)">Redo</button>
+      </div>
+      <div class="export-actions" style="display:flex;gap:0.5rem;">
+        <button type="button" id="exportExcelBtn" title="Download table assignment as Excel/CSV">Export Excel</button>
+        <button type="button" id="exportPdfBtn" title="Print or save seat plan as PDF">Print plan (PDF)</button>
+      </div>
     </div>
   </header>
   <div class="app-layout">
@@ -141,6 +155,11 @@
           <div class="config-row"><label>Tables</label><input type="number" id="tableCount" min="1" max="50" value="4" /></div>
         </div>
         <div class="guest-panel-header"><h3>Guest List</h3></div>
+        <div class="guest-actions" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
+          <button type="button" id="importGuestsBtn" style="padding:0.35rem 0.6rem;font-size:0.8rem;">Import list</button>
+          <button type="button" id="autoAssignBtn" style="padding:0.35rem 0.6rem;font-size:0.8rem;">Auto-assign</button>
+          <input type="file" id="importGuestsFile" accept=".csv,.txt" style="display:none;" />
+        </div>
         <div class="guest-list-scroll" id="guestList"></div>
         <div class="groups-section">
           <h4>Groups</h4>
@@ -153,6 +172,11 @@
     </aside>
     <div class="resizer" id="resizerLeft" title="Drag to resize"></div>
     <main class="panel panel-center">
+      <div class="main-zoom-bar">
+        <button type="button" id="mainZoomOut" title="Zoom out">−</button>
+        <span id="zoomPercent">135%</span>
+        <button type="button" id="mainZoomIn" title="Zoom in">+</button>
+      </div>
       <div class="venue" id="venue">
         <div class="venue-canvas" id="venueCanvas">
           <div class="venue-inner" id="venueInner">
@@ -166,6 +190,7 @@
         <div class="venue-zoom-controls">
           <button type="button" id="venueZoomIn" title="Zoom in">+</button>
           <button type="button" id="venueZoomOut" title="Zoom out">−</button>
+          <span class="zoom-hint">Ctrl+scroll or pinch</span>
         </div>
       </div>
     </main>
@@ -478,9 +503,148 @@
       saveToHistory();
       requestAnimationFrame(() => renderCenterAndRight());
     }
+    function importGuestsFromFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = (reader.result || '').trim();
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        const groups = getGroups();
+        const groupIds = new Set(groups.map(gr => gr.id));
+        let added = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const parts = line.split(/[,;\t]/).map(p => p.trim());
+          const name = (parts[0] || '').trim();
+          if (!name) continue;
+          if (i === 0 && /^name$/i.test(name)) continue;
+          let group = 'other';
+          if (parts[1]) {
+            const gLabel = parts[1].toLowerCase().replace(/\s+/g, '_');
+            const existing = groups.find(gr => gr.id === gLabel || gr.label.toLowerCase().replace(/\s+/g, '_') === gLabel);
+            if (existing) group = existing.id;
+            else if (!groupIds.has(gLabel)) {
+              state.guestGroups = state.guestGroups || [];
+              state.guestGroups.push({ id: gLabel, label: parts[1], color: '#F5F0E8' });
+              groupIds.add(gLabel);
+              group = gLabel;
+            }
+          }
+          const isChild = /^(1|yes|true|x|child)$/i.test((parts[2] || '').trim());
+          const id = 'guest-' + Date.now() + '-' + added;
+          state.guests.push({ id, name, group, isBride: false, isGroom: false, tableId: null, isChild });
+          added++;
+        }
+        state.guestCount = state.guests.length;
+        saveState();
+        saveToHistory();
+        renderAll();
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
+    function exportToExcel() {
+      const guestMap = Object.fromEntries(state.guests.map(g => [g.id, g]));
+      const rows = [['Guest', 'Group', 'Table', 'Seat']];
+      state.tables.forEach(table => {
+        table.seats.forEach((guestId, idx) => {
+          if (!guestId) return;
+          const g = guestMap[guestId];
+          const groupLabel = g ? (getGroups().find(gr => gr.id === g.group) || {}).label || g.group : '';
+          rows.push([g.name, groupLabel, table.name, idx + 1]);
+        });
+      });
+      const unassigned = state.guests.filter(g => !g.tableId);
+      unassigned.forEach(g => {
+        const gl = (getGroups().find(gr => gr.id === g.group) || {}).label || g.group;
+        rows.push([g.name, gl, '(unassigned)', '']);
+      });
+      const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'wedding-seating.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+    function printSeatPlan() {
+      const canvasEl = document.getElementById('venueCanvas');
+      if (!canvasEl || typeof html2canvas === 'undefined') {
+        alert('Exporting plan as image requires html2canvas. Please check your connection and try again.');
+        return;
+      }
+      const savedZoom = venueZoom;
+      const savedPanX = venuePanX;
+      const savedPanY = venuePanY;
+      venueZoom = 0.85;
+      venuePanX = 0;
+      venuePanY = 0;
+      applyVenueTransform();
+      requestAnimationFrame(() => {
+        html2canvas(canvasEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#faf6f1' }).then(canvas => {
+          venueZoom = savedZoom;
+          venuePanX = savedPanX;
+          venuePanY = savedPanY;
+          applyVenueTransform();
+          const imgData = canvas.toDataURL('image/png');
+          const JsPDF = (typeof jspdf !== 'undefined' && jspdf.jsPDF) ? jspdf.jsPDF : (window.jspdf && window.jspdf.jsPDF);
+          if (JsPDF) {
+            const pdf = new JsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', format: 'a4' });
+            const pw = pdf.internal.pageSize.getWidth();
+            const ph = pdf.internal.pageSize.getHeight();
+            const scale = Math.min(pw / canvas.width, ph / canvas.height);
+            const w = canvas.width * scale;
+            const h = canvas.height * scale;
+            pdf.addImage(imgData, 'PNG', (pw - w) / 2, (ph - h) / 2, w, h);
+            pdf.save('wedding-seat-plan.pdf');
+          } else {
+            const a = document.createElement('a');
+            a.href = imgData;
+            a.download = 'wedding-seat-plan.png';
+            a.click();
+          }
+        }).catch(() => {
+          venueZoom = savedZoom;
+          venuePanX = savedPanX;
+          venuePanY = savedPanY;
+          applyVenueTransform();
+          alert('Could not capture the plan. Try again.');
+        });
+      });
+    }
+    function autoAssignGuests() {
+      const unassigned = state.guests.filter(g => !g.tableId && !g.isBride && !g.isGroom);
+      if (unassigned.length === 0) return;
+      const groups = getGroups();
+      const byGroup = {};
+      unassigned.forEach(g => {
+        if (!byGroup[g.group]) byGroup[g.group] = [];
+        byGroup[g.group].push(g);
+      });
+      const sorted = [];
+      Object.keys(byGroup).sort().forEach(gid => {
+        byGroup[gid].forEach(g => sorted.push(g));
+      });
+      const tablesWithSpace = state.tables.map(t => ({ table: t, seats: t.seats.map((id, i) => ({ id, i })).filter(s => !s.id) })).filter(x => x.seats.length > 0);
+      let idx = 0;
+      tablesWithSpace.forEach(({ table, seats }) => {
+        seats.forEach(seat => {
+          if (idx >= sorted.length) return;
+          const g = sorted[idx++];
+          const seatIndex = seat.i;
+          state.tables.forEach(t => { t.seats = t.seats.map(id => id === g.id ? null : id); });
+          g.tableId = table.id;
+          table.seats[seatIndex] = g.id;
+        });
+      });
+      saveState();
+      saveToHistory();
+      renderCenterAndRight();
+      renderGuestList();
+    }
     function applyVenueTransform() {
       const el = document.getElementById('venueCanvas');
       if (el) el.style.transform = `translate(${venuePanX}px, ${venuePanY}px) scale(${venueZoom})`;
+      const pct = document.getElementById('zoomPercent');
+      if (pct) pct.textContent = Math.round(venueZoom * 100) + '%';
     }
     function setSelectedTable(id) {
       selectedTableId = id;
@@ -500,13 +664,19 @@
     function renderGuestList() {
       const container = document.getElementById('guestList');
       container.innerHTML = '';
-      state.guests.forEach((g, i) => {
+      const bride = state.guests[0];
+      const groom = state.guests[1];
+      const rest = state.guests.slice(2);
+      const unassigned = rest.filter(g => !g.tableId);
+      const assigned = rest.filter(g => g.tableId);
+      const sortedGuests = [bride, groom, ...unassigned, ...assigned];
+      sortedGuests.forEach((g, i) => {
         const div = document.createElement('div');
         div.className = 'guest-list-item' + (i < 2 ? ' special-row' : '') + (g.tableId ? ' assigned' : '');
         div.style.borderLeftColor = getGroupColor(g.group);
         div.draggable = true;
         div.dataset.guestId = g.id;
-        const label = i === 0 ? '👰 Bride' : i === 1 ? '🤵 Groom' : '';
+        const label = (g.isBride ? '👰 Bride' : '') || (g.isGroom ? '🤵 Groom' : '');
         div.innerHTML = `
           <div class="guest-drag-handle">⋮⋮</div>
           <div class="guest-content">
@@ -885,10 +1055,28 @@
 
     const venueEl = document.getElementById('venue');
     venueEl.addEventListener('wheel', e => {
+      if (!e.ctrlKey) return;
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.12 : 0.12;
       venueZoom = Math.max(0.35, Math.min(2.5, venueZoom + delta));
       applyVenueTransform();
+    }, { passive: false });
+
+    let pinchStartDist = 0, pinchStartZoom = 1;
+    venueEl.addEventListener('touchstart', e => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        pinchStartDist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+        pinchStartZoom = venueZoom;
+      }
+    }, { passive: false });
+    venueEl.addEventListener('touchmove', e => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const d = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+        venueZoom = Math.max(0.35, Math.min(2.5, pinchStartZoom * (d / pinchStartDist)));
+        applyVenueTransform();
+      }
     }, { passive: false });
 
     venueEl.addEventListener('mousedown', e => {
@@ -919,8 +1107,18 @@
       if (!e.target.closest('.table-wrapper')) { selectedTableId = null; document.getElementById('tableSettingsPanel').style.display = 'none'; renderCenterAndRight(); }
     });
 
-    document.getElementById('venueZoomIn').addEventListener('click', () => { venueZoom = Math.min(2.5, venueZoom + 0.2); applyVenueTransform(); });
-    document.getElementById('venueZoomOut').addEventListener('click', () => { venueZoom = Math.max(0.35, venueZoom - 0.2); applyVenueTransform(); });
+    function doZoomIn() { venueZoom = Math.min(2.5, venueZoom + 0.2); applyVenueTransform(); }
+    function doZoomOut() { venueZoom = Math.max(0.35, venueZoom - 0.2); applyVenueTransform(); }
+    document.getElementById('venueZoomIn').addEventListener('click', doZoomIn);
+    document.getElementById('venueZoomOut').addEventListener('click', doZoomOut);
+    document.getElementById('mainZoomIn').addEventListener('click', doZoomIn);
+    document.getElementById('mainZoomOut').addEventListener('click', doZoomOut);
+
+    document.getElementById('importGuestsBtn').addEventListener('click', () => document.getElementById('importGuestsFile').click());
+    document.getElementById('importGuestsFile').addEventListener('change', e => { const f = e.target.files[0]; if (f) { importGuestsFromFile(f); e.target.value = ''; } });
+    document.getElementById('autoAssignBtn').addEventListener('click', () => autoAssignGuests());
+    document.getElementById('exportExcelBtn').addEventListener('click', () => exportToExcel());
+    document.getElementById('exportPdfBtn').addEventListener('click', () => printSeatPlan());
   </script>
 </body>
 </html>
