@@ -113,11 +113,6 @@
     .add-group-row button { padding: 0.35rem 0.6rem; font-size: 0.8rem; }
     .guest-child-wrap { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; }
     .guest-child-wrap input { width: auto; }
-    .unassigned-zone { position: absolute; bottom: 24px; left: 24px; right: 24px; padding: 0.75rem 1rem; background: var(--pastel-beige); border: 2px dashed rgba(92, 74, 61, 0.2); border-radius: var(--radius); min-height: 56px; }
-    .unassigned-zone.drag-over { background: var(--pastel-pink); border-color: var(--pastel-pink); }
-    .unassigned-label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.4rem; }
-    .unassigned-guests { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-    .unassigned-chip { font-size: 0.75rem; padding: 0.3rem 0.5rem; background: var(--bg-white); border-radius: 999px; }
     .table-settings { padding: 1rem; margin-bottom: 1rem; background: var(--pastel-beige); border-radius: var(--radius-sm); }
     .table-settings h3 { margin: 0 0 0.75rem 0; font-size: 0.95rem; }
     .table-settings .field { margin-bottom: 0.6rem; }
@@ -141,9 +136,10 @@
         <button type="button" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
         <button type="button" id="redoBtn" title="Redo (Ctrl+Y)">Redo</button>
       </div>
-      <div class="export-actions" style="display:flex;gap:0.5rem;">
+      <div class="export-actions" style="display:flex;gap:0.5rem;flex-wrap:wrap;">
         <button type="button" id="exportExcelBtn" title="Download table assignment as Excel/CSV">Export Excel</button>
-        <button type="button" id="exportPdfBtn" title="Print or save seat plan as PDF">Print plan (PDF)</button>
+        <button type="button" id="exportPdfListBtn" title="Export PDF as list (tables and guests)">Export PDF (list)</button>
+        <button type="button" id="exportPdfImageBtn" title="Export PDF as image of the seat plan">Export PDF (image)</button>
       </div>
     </div>
   </header>
@@ -181,10 +177,6 @@
         <div class="venue-canvas" id="venueCanvas">
           <div class="venue-inner" id="venueInner">
             <div id="tableContainer"></div>
-          </div>
-          <div class="unassigned-zone" id="unassignedZone">
-            <span class="unassigned-label">Unassigned</span>
-            <div class="unassigned-guests" id="unassignedGuests"></div>
           </div>
         </div>
         <div class="venue-zoom-controls">
@@ -565,10 +557,73 @@
       a.click();
       URL.revokeObjectURL(a.href);
     }
-    function printSeatPlan() {
-      const canvasEl = document.getElementById('venueCanvas');
-      if (!canvasEl || typeof html2canvas === 'undefined') {
-        alert('Exporting plan as image requires html2canvas. Please check your connection and try again.');
+    function exportPdfList() {
+      const w = window.open('', '_blank');
+      if (!w) { alert('Please allow pop-ups to export PDF.'); return; }
+      const guestMap = Object.fromEntries(state.guests.map(g => [g.id, g]));
+      let html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Seat Plan</title><style>body{font-family:Quicksand,sans-serif;padding:24px;background:#faf6f1;color:#5C4A3D;} .table-block{margin-bottom:24px;} .table-name{font-weight:700;margin-bottom:8px;font-size:1.1rem;} .table-guests{list-style:none;padding:0;margin:0;} .table-guests li{padding:4px 0;border-bottom:1px solid #eee;} .unassigned{margin-top:24px;padding:12px;background:#f5f0e8;border-radius:8px;} h1{margin-top:0;}</style></head><body><h1>Wedding Seat Plan</h1>';
+      state.tables.forEach(t => {
+        html += '<div class="table-block"><div class="table-name">' + escapeHtml(t.name) + '</div><ul class="table-guests">';
+        t.seats.forEach((id, i) => {
+          const g = id ? guestMap[id] : null;
+          html += '<li>' + (g ? escapeHtml((g.isBride ? '👰 ' : '') + (g.isGroom ? '🤵 ' : '') + g.name) : 'Seat ' + (i + 1)) + '</li>';
+        });
+        html += '</ul></div>';
+      });
+      const unassigned = state.guests.filter(g => !g.tableId);
+      if (unassigned.length) {
+        html += '<div class="unassigned"><strong>Unassigned</strong><ul class="table-guests">';
+        unassigned.forEach(g => { html += '<li>' + escapeHtml(g.name) + '</li>'; });
+        html += '</ul></div>';
+      }
+      html += '</body></html>';
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      setTimeout(() => { w.print(); w.close(); }, 300);
+    }
+    function openPlanPrintView() {
+      const w = window.open('', '_blank', 'width=1000,height=700');
+      if (!w) { alert('Please allow pop-ups to open the plan view.'); return; }
+      const guestMap = Object.fromEntries(state.guests.map(g => [g.id, g]));
+      const groups = getGroups();
+      const getColor = (id) => (groups.find(gr => gr.id === id) || {}).color || '#F5F0E8';
+      const pad = 40;
+      let maxX = 0, maxY = 0;
+      state.tables.forEach(t => {
+        const ww = t.shape === 'round' ? t.radius * 2 : t.width;
+        const hh = t.shape === 'round' ? t.radius * 2 : t.height;
+        if (t.x + ww + pad > maxX) maxX = t.x + ww + pad;
+        if (t.y + hh + pad > maxY) maxY = t.y + hh + pad;
+      });
+      const scale = Math.min(900 / Math.max(maxX, 1), 600 / Math.max(maxY, 1), 1.2);
+      let html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Seat Plan</title><style>body{margin:0;font-family:Quicksand,sans-serif;background:#faf6f1;color:#5C4A3D;padding:20px;} .plan{position:relative;width:' + (maxX * scale) + 'px;height:' + (maxY * scale) + 'px;} .tbl{position:absolute;background:#F5F0E8;border:2px solid rgba(92,74,61,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#8B7355;} .tbl.round{border-radius:50%;} .seat-pos{position:absolute;font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.95);border:1px solid rgba(92,74,61,0.2);white-space:nowrap;}</style></head><body><h2 style="margin:0 0 12px 0;">Seat Plan</h2><p style="font-size:12px;color:#8B7355;">Print this page (Ctrl+P) and choose &quot;Save as PDF&quot;</p><div class="plan">';
+      state.tables.forEach(t => {
+        const ww = (t.shape === 'round' ? t.radius * 2 : t.width) * scale;
+        const hh = (t.shape === 'round' ? t.radius * 2 : t.height) * scale;
+        const left = t.x * scale;
+        const top = t.y * scale;
+        html += '<div class="tbl ' + (t.shape === 'round' ? 'round' : '') + '" style="left:' + left + 'px;top:' + top + 'px;width:' + ww + 'px;height:' + hh + 'px;">' + escapeHtml(t.name) + '</div>';
+        const positions = t.seatPositions || [];
+        (t.seats || []).forEach((guestId, i) => {
+          const pos = positions[i] || { x: 0, y: 0 };
+          const g = guestId ? guestMap[guestId] : null;
+          const name = g ? (g.isBride ? '👰 ' : '') + (g.isGroom ? '🤵 ' : '') + g.name : ('Seat ' + (i + 1));
+          const sx = left + ww / 2 + (pos.x || 0) * scale;
+          const sy = top + hh / 2 + (pos.y || 0) * scale;
+          html += '<div class="seat-pos" style="left:' + sx + 'px;top:' + sy + 'px;background:' + (g ? getColor(g.group) : '#fff') + ';">' + escapeHtml(name) + '</div>';
+        });
+      });
+      html += '</div></body></html>';
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+    }
+    function exportPdfImage() {
+      const venueEl = document.getElementById('venue');
+      const h2c = window.html2canvas || (typeof html2canvas !== 'undefined' ? html2canvas : null);
+      if (!venueEl || !h2c) {
+        openPlanPrintView();
         return;
       }
       const savedZoom = venueZoom;
@@ -579,34 +634,56 @@
       venuePanY = 0;
       applyVenueTransform();
       requestAnimationFrame(() => {
-        html2canvas(canvasEl, { scale: 2, useCORS: true, logging: false, backgroundColor: '#faf6f1' }).then(canvas => {
-          venueZoom = savedZoom;
-          venuePanX = savedPanX;
-          venuePanY = savedPanY;
-          applyVenueTransform();
-          const imgData = canvas.toDataURL('image/png');
-          const JsPDF = (typeof jspdf !== 'undefined' && jspdf.jsPDF) ? jspdf.jsPDF : (window.jspdf && window.jspdf.jsPDF);
-          if (JsPDF) {
-            const pdf = new JsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', format: 'a4' });
-            const pw = pdf.internal.pageSize.getWidth();
-            const ph = pdf.internal.pageSize.getHeight();
-            const scale = Math.min(pw / canvas.width, ph / canvas.height);
-            const w = canvas.width * scale;
-            const h = canvas.height * scale;
-            pdf.addImage(imgData, 'PNG', (pw - w) / 2, (ph - h) / 2, w, h);
-            pdf.save('wedding-seat-plan.pdf');
-          } else {
-            const a = document.createElement('a');
-            a.href = imgData;
-            a.download = 'wedding-seat-plan.png';
-            a.click();
-          }
-        }).catch(() => {
-          venueZoom = savedZoom;
-          venuePanX = savedPanX;
-          venuePanY = savedPanY;
-          applyVenueTransform();
-          alert('Could not capture the plan. Try again.');
+        requestAnimationFrame(() => {
+          h2c(venueEl, {
+            scale: 2,
+            useCORS: false,
+            allowTaint: true,
+            logging: false,
+            backgroundColor: '#faf6f1',
+            ignoreElements: function(el) { return el.closest && el.closest('.venue-zoom-controls'); },
+            windowWidth: venueEl.offsetWidth,
+            windowHeight: venueEl.offsetHeight
+          }).then(canvas => {
+            venueZoom = savedZoom;
+            venuePanX = savedPanX;
+            venuePanY = savedPanY;
+            applyVenueTransform();
+            const imgData = canvas.toDataURL('image/png');
+            try {
+              const jsPDF = window.jspdf || (typeof jspdf !== 'undefined' ? jspdf : null);
+              const JsPDFConstructor = jsPDF && (jsPDF.jsPDF || jsPDF.default);
+              if (JsPDFConstructor) {
+                const orient = canvas.width > canvas.height ? 'landscape' : 'portrait';
+                const pdf = new JsPDFConstructor({ orientation: orient, format: 'a4', unit: 'mm' });
+                const pw = pdf.internal.pageSize.getWidth();
+                const ph = pdf.internal.pageSize.getHeight();
+                const px2mm = 25.4 / 96;
+                const wMm = canvas.width * px2mm;
+                const hMm = canvas.height * px2mm;
+                const scale = Math.min(pw / wMm, ph / hMm) * 0.95;
+                pdf.addImage(imgData, 'PNG', (pw - wMm * scale) / 2, (ph - hMm * scale) / 2, wMm * scale, hMm * scale);
+                pdf.save('wedding-seat-plan.pdf');
+              } else {
+                downloadPng(imgData);
+              }
+            } catch (err) {
+              downloadPng(imgData);
+            }
+            function downloadPng(dataUrl) {
+              const a = document.createElement('a');
+              a.href = dataUrl;
+              a.download = 'wedding-seat-plan.png';
+              a.click();
+            }
+          }).catch(function(err) {
+            venueZoom = savedZoom;
+            venuePanX = savedPanX;
+            venuePanY = savedPanY;
+            applyVenueTransform();
+            console.error('html2canvas error', err);
+            openPlanPrintView();
+          });
         });
       });
     }
@@ -927,8 +1004,6 @@
         container.appendChild(wrap);
       });
 
-      const unassigned = state.guests.filter(g => !g.tableId);
-      document.getElementById('unassignedGuests').innerHTML = unassigned.map(g => `<span class="unassigned-chip">${(g.isBride ? '👰 ' : '') + (g.isGroom ? '🤵 ' : '') + (g.isChild ? '👶 ' : '') + escapeHtml(g.name)}</span>`).join('') || '';
     }
 
     function bindTableSettings() {
@@ -945,12 +1020,16 @@
     }
 
     function initUnassignedDrop() {
-      const zone = document.getElementById('unassignedZone');
-      zone.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; zone.classList.add('drag-over'); });
-      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-      zone.addEventListener('drop', e => {
+      const venueEl = document.getElementById('venue');
+      if (!venueEl) return;
+      venueEl.addEventListener('dragover', e => {
+        if (e.target.closest('.table-wrapper')) return;
         e.preventDefault();
-        zone.classList.remove('drag-over');
+        e.dataTransfer.dropEffect = 'move';
+      });
+      venueEl.addEventListener('drop', e => {
+        if (e.target.closest('.table-wrapper')) return;
+        e.preventDefault();
         const id = e.dataTransfer.getData('text/plain');
         let src = null;
         try { src = JSON.parse(e.dataTransfer.getData('application/json') || 'null'); } catch (_) {}
@@ -1080,7 +1159,7 @@
     }, { passive: false });
 
     venueEl.addEventListener('mousedown', e => {
-      if (e.target.closest('.table-wrapper') || e.target.closest('.unassigned-zone') || e.target.closest('.venue-zoom-controls')) return;
+      if (e.target.closest('.table-wrapper') || e.target.closest('.venue-zoom-controls')) return;
       venuePanning = true;
       venueDidPan = false;
       const startX = e.clientX - venuePanX;
@@ -1118,7 +1197,8 @@
     document.getElementById('importGuestsFile').addEventListener('change', e => { const f = e.target.files[0]; if (f) { importGuestsFromFile(f); e.target.value = ''; } });
     document.getElementById('autoAssignBtn').addEventListener('click', () => autoAssignGuests());
     document.getElementById('exportExcelBtn').addEventListener('click', () => exportToExcel());
-    document.getElementById('exportPdfBtn').addEventListener('click', () => printSeatPlan());
+    document.getElementById('exportPdfListBtn').addEventListener('click', () => exportPdfList());
+    document.getElementById('exportPdfImageBtn').addEventListener('click', () => exportPdfImage());
   </script>
 </body>
 </html>
