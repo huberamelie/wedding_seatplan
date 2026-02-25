@@ -3,25 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wedding Seatplan</title>
+    <title>Wedding Seat Plan</title>
     <style>
-        /* Add your CSS styles here */
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-        }
-        /* Example CSS */
-        h1 {
-            color: #333;
-        }
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid black; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .highlight { background-color: yellow; }
     </style>
 </head>
 <body>
-    <h1>Welcome to the Wedding Seatplan</h1>
+    <h1>Wedding Seat Plan</h1>
+    <table id="seatPlan">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Table</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Seating arrangements will be dynamically added here -->
+        </tbody>
+    </table>
     <script>
-        // Add your JavaScript code here
-        console.log('Welcome to the wedding seatplan application');
+        const seatArrangements = [
+            { name: "John Doe", table: "1" },
+            { name: "Jane Smith", table: "2" },
+            // Add more guest entries here
+        ];
+
+        const seatPlanBody = document.querySelector('#seatPlan tbody');
+        seatArrangements.forEach(guest => {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td>${guest.name}</td><td>${guest.table}</td>`;
+            seatPlanBody.appendChild(row);
+        });
     </script>
 </body>
 </html>
